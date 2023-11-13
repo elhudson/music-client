@@ -4,8 +4,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import multer from "multer";
-import {exec, spawn} from 'node:child_process'
+import {execSync, spawn} from 'node:child_process'
 import url from "node:url";
+import nodeshout from 'nodeshout'
 
 import * as tools from '../shared/tools.mjs'
 import * as paths from '../shared/paths.mjs'
@@ -14,40 +15,59 @@ const app = express();
 
 const storage = multer.memoryStorage()
 const upload = multer({ storage: storage })
-const scripts=path.join(paths.root, 'src/server/icecast/')
 
 app.use(express.static('public'))
 
-const server_command=(liq)=> {
-  const telnet=spawn('telnet', ['localhost', '1234'])
-  const ls=spawn('echo', [liq])
+nodeshout.init()
+
+const shout=nodeshout.create()
+shout.setHost('146.115.71.239')
+shout.setPort('8000')
+shout.setUser('source')
+shout.setPassword('hackme')
+shout.setMount('soulweight.ogg')
+shout.setFormat(0)
+shout.open()
+
+// const server_command=(liq)=> {
+//   const telnet=spawn('telnet', ['localhost', '1234'])
+//   const ls=spawn('echo', [liq])
   
-  ls.stdout.on('data', (data)=> {
-    telnet.stdin.write(data)
-  })
+//   ls.stdout.on('data', (data)=> {
+//     telnet.stdin.write(data)
+//   })
 
-  telnet.stdout.on('data', (data)=> {
-    console.log(data.toString('utf-8'))
-  })
+//   telnet.stdout.on('data', (data)=> {
+//     console.log(data.toString('utf-8'))
+//   })
 
-  telnet.stderr.on('data', (data)=> {
-    console.log(data.toString('utf-8'))
-  })
-}
+//   telnet.stderr.on('data', (data)=> {
+//     console.log(data.toString('utf-8'))
+//   })
+// }
 
-function cmd(bash) {
-  exec(bash, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`exec error: ${error}`);
-      return;
-    }
-    console.log(`stdout: ${stdout}`);
-    console.error(`stderr: ${stderr}`);
-})
-}
+// function cmd(bash) {
+//   execSync(bash, (error, stdout, stderr) => {
+//     if (error) {
+//       console.error(`exec error: ${error}`);
+//       return error
+//     }
+//     console.log(`stdout: ${stdout}`);
+//     console.error(`stderr: ${stderr}`);    
+//   })
+// }
 
 app.get('/start', (req, res)=> {
-  cmd(`liquidsoap ${path.join(scripts, 'start.liq')} -- -d ${paths.tracks}`)
+  const r=cmd(`liquidsoap ${path.join(scripts, 'start.liq')} -- -d ${paths.tracks}`)
+  if (r!=null) {
+    console.log(r.error)
+    res.send('An error occurred.')
+  }
+  res.send('Server started.')
+})
+
+app.get('/stop', (req, res)=> {
+  cmd('pkill -x liquidsoap')
   res.redirect('/')
 })
 
@@ -56,13 +76,8 @@ const params=(res)=>url.parse(res.req.url, true).query
 
 app.get("/song", async (req, res) => {
   const song=params(res)
-  // const data=song.action=='play' ? `http://localhost:3000/music/tracks/${tools.songToFilename({title:song.title})}` : ''
   const file=path.join(paths.tracks, tools.songToFilename({title:song.title}))
-  song.action=='play' &&
-    fs.writeFileSync(
-      path.join(paths.root, '/public/music/current.m4a'), 
-      fs.readFileSync(file, {encoding:'utf-8'})
-    ) 
+
 })
 
 

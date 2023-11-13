@@ -6,7 +6,9 @@ import 'react-h5-audio-player/lib/styles.css';
 import {Tab, TabList, TabPanel, Tabs} from 'react-tabs'
 import * as tools from '../shared/tools.mjs'
 
-import {Play, Pause} from 'lucide-react'
+import {Switch} from "@nextui-org/react";
+
+import {Play, Pause, Music} from 'lucide-react'
 import { css } from '@emotion/css';
 
 const parse_filenames = async (prom) => {
@@ -20,12 +22,17 @@ const playlists = await parse_filenames(fetch('/playlists'))
 const songs = await parse_filenames(fetch('/songs'))
 
 function App() {
+  const [server, toggleServer]=useState(false)
+  const serverOnOff=async ()=> {
+    const action = server ? 'stop' : 'start'
+    await fetch(`/${action}`).then((c)=> {
+      console.log(c.text())
+    })
+    toggleServer(!server)
+  }
   return (
     <>
-    <button onClick={async ()=>await fetch('/start')}>Start Server</button>
-    <audio controls>
-      <source src='http://146.115.71.239:8000/soulweight.ogg' />
-    </audio>
+    <Switch onChange={serverOnOff}>Server</Switch>
     <Tabs>
       <TabList>
         <Tab>Playlists</Tab>
@@ -78,6 +85,7 @@ function Playlists({playlists}) {
 }
 
 function Playlist({ title }) {
+  const [playing, setPlaying]=useState(null)
   const getPlaylist = async f => await parse_filenames(fetch(`/playlist?title=${title}`))
   const pls = useAsync(getPlaylist)
 
@@ -89,12 +97,12 @@ function Playlist({ title }) {
     <h3>{title}</h3>
     <button onClick={showUpload}>Add</button>
     <AddSong pls={title} show={upload} />
-    {pls.result && pls.result.map(t => <Song title={t} />)}
+    {pls.result && pls.result.map(t => <Song title={t} playing={t==playing} setPlaying={setPlaying} />)}
     </>
   )
 }
 
-function Song({ title }) {
+function Song({ title, setPlaying, playing=false }) {
   const endpoint=(t, action)=> {
     return async () => await fetch(new Uri()
       .setPath('song')
@@ -125,9 +133,16 @@ function Song({ title }) {
       //   autoPlayAfterSrcChange={false}
       // />
       <div>
+        {playing && <Music/>}
         {title}
-        <button onClick={player}>Play</button>
-        <button onClick={pauser}>Pause</button>
+        <button onClick={()=> {
+          player()
+          setPlaying(title)
+        }}>Play</button>
+        <button onClick={()=> {
+          pauser() 
+          setPlaying(null)
+        }}>Pause</button>
       </div>
   )
 }
