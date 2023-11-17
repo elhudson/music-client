@@ -1,5 +1,5 @@
 export function songToFilename({title, playlist=false}) {
-  const suffix=playlist ? '.pls' : '.m4a'
+  const suffix=playlist ? '.pls' : '.mp3'
   const filename=title.replaceAll(' ', '_').toLowerCase()+suffix
   return filename
 }

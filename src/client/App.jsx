@@ -6,9 +6,7 @@ import 'react-h5-audio-player/lib/styles.css';
 import {Tab, TabList, TabPanel, Tabs} from 'react-tabs'
 import * as tools from '../shared/tools.mjs'
 
-import {Switch} from "@nextui-org/react";
-
-import {Play, Pause, Music} from 'lucide-react'
+import {Play, Pause, Music, Plus} from 'lucide-react'
 import { css } from '@emotion/css';
 
 const parse_filenames = async (prom) => {
@@ -22,17 +20,7 @@ const playlists = await parse_filenames(fetch('/playlists'))
 const songs = await parse_filenames(fetch('/songs'))
 
 function App() {
-  const [server, toggleServer]=useState(false)
-  const serverOnOff=async ()=> {
-    const action = server ? 'stop' : 'start'
-    await fetch(`/${action}`).then((c)=> {
-      console.log(c.text())
-    })
-    toggleServer(!server)
-  }
   return (
-    <>
-    <Switch onChange={serverOnOff}>Server</Switch>
     <Tabs>
       <TabList>
         <Tab>Playlists</Tab>
@@ -42,33 +30,61 @@ function App() {
         <Playlists playlists={playlists} />
       </TabPanel>
       <TabPanel>
-        <h1>Songs</h1>
-        <div>
-          {songs.map(s => <Song title={s} />)}
-        </div>
+        <AllSongs songs={songs} />
       </TabPanel>
     </Tabs>
-    </>
-  );
+  )
 }
 
-function AddSong({ pls, show = false }) {
+function AllSongs({songs}) {
+  const [playing, setPlaying]=useState(null)
+  return(
+    <>
+      <h1>Songs</h1>
+      <div>
+        <AddSong />
+        {songs.map(s => <Song 
+            title={s} 
+            playing={playing==s}
+            setPlaying={setPlaying}
+          />)}
+      </div>
+    </>
+  )
+}
+
+function UploadSong({ pls=null, show = false }) {
+  const url = pls != null ? `/playlist?title=${pls}&action=add` : '/songs'
   return (
     <form
       style={{
-        'display': show ? 'block' : 'none'
+        'display': show ? 
+        'block' : 'none'
       }}
-      action={`/playlist?title=${pls}&action=add`}
+      action={url}
       method="post"
       encType="multipart/form-data">
       <label htmlFor='title'>Title </label>
       <input id='title' name='title' type='text' />
       <label htmlFor='file'>File</label>
       <input id="file" name="file" type="file" />
-      <button>
-        Upload
-      </button>
+
+      <button>Upload</button>
+
     </form>
+  )
+}
+
+function AddSong({pls=null}) {
+  const [upload, setUpload] = useState(false)
+  const showUpload = () => setUpload(!upload)
+  return(
+    <div>
+      <button onClick={showUpload}>
+        <Plus/>
+      </button>
+      <UploadSong pls={pls} show={upload} />
+    </div>
   )
 }
 
@@ -89,66 +105,31 @@ function Playlist({ title }) {
   const getPlaylist = async f => await parse_filenames(fetch(`/playlist?title=${title}`))
   const pls = useAsync(getPlaylist)
 
-  const [upload, setUpload] = useState(false)
-  const showUpload = () => setUpload(!upload)
-
   return (
     <>
     <h3>{title}</h3>
-    <button onClick={showUpload}>Add</button>
-    <AddSong pls={title} show={upload} />
-    {pls.result && pls.result.map(t => <Song title={t} playing={t==playing} setPlaying={setPlaying} />)}
+    {pls.result && 
+      pls.result.map(t => <Song 
+        title={t} 
+        playing={t==playing} 
+        setPlaying={setPlaying} />)}
     </>
   )
 }
 
 function Song({ title, setPlaying, playing=false }) {
-  const endpoint=(t, action)=> {
-    return async () => await fetch(new Uri()
-      .setPath('song')
-      .setQuery(`?title=${t}&action=${action}`))
-  }
-  const player = endpoint(title, 'play')
-  const pauser = endpoint(title, 'pause')
+  const setActive=async (t)=>await fetch(`/song?title=${t}`)
   return (
-      // <AudioPlayer
-      //   src={`/music/tracks/${tools.songToFilename({ title: title })}`}
-      //   autoPlay={false}
-      //   showSkipControls={false}
-      //   showJumpControls={false}
-      //   layout={'horizontal'}
-      //   customProgressBarSection={[
-      //     RHAP_UI.MAIN_CONTROLS,
-      //     RHAP_UI.LOOP,
-      //     RHAP_UI.CURRENT_TIME,
-      //     RHAP_UI.PROGRESS_BAR,
-      //     RHAP_UI.CURRENT_LEFT_TIME
-      //   ]}
-      //   customVolumeControls={[]}
-      //   customAdditionalControls={[]}
-      //   customControlsSection={[]}
-      //   header={title}
-      //   onPlay={player}
-      //   onPause={pauser}
-      //   autoPlayAfterSrcChange={false}
-      // />
       <div>
         {playing && <Music/>}
         {title}
-        <button onClick={()=> {
-          player()
+        <button onClick={async ()=> {
           setPlaying(title)
+          await setActive(title).then(async ()=> await fetch('/play'))
         }}>Play</button>
-        <button onClick={()=> {
-          pauser() 
-          setPlaying(null)
-        }}>Pause</button>
+        <button onClick={async ()=> await fetch('/pause')}>Pause</button>
       </div>
   )
 }
-
-
-
-
 
 export default App;
